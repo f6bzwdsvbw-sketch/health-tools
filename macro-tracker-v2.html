@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Macro Tracker</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0f; --surface: #181818; --surface2: #1e1e1e;
+    --border: #242424; --border2: #2e2e2e; --text: #f0f0f0;
+    --muted: #888; --dim: #555; --dimmer: #333;
+    --blue: #4a9eff; --green: #52c97a; --amber: #f0a830;
+    --purple: #c97adb; --red: #e05252;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, 'Helvetica Neue', sans-serif; min-height: 100vh; padding-bottom: 80px; font-size: 14px; line-height: 1.5; }
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 18px 16px 16px; position: sticky; top: 0; z-index: 20; }
+  .header-inner { max-width: 520px; margin: 0 auto; }
+  .header-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+  .eyebrow { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3px; }
+  h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; }
+  .date-nav { display: flex; align-items: center; gap: 8px; }
+  .date-nav button { background: none; border: 1px solid var(--border2); color: var(--muted); width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+  .date-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+  .date-label { font-size: 12px; color: var(--muted); min-width: 80px; text-align: center; }
+  .date-label.today { color: var(--blue); font-weight: 600; }
+  .macro-bars { display: flex; flex-direction: column; gap: 9px; }
+  .macro-row { display: flex; flex-direction: column; gap: 4px; }
+  .macro-row-top { display: flex; justify-content: space-between; }
+  .macro-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  .macro-value { font-size: 12px; font-weight: 600; }
+  .macro-value .target { color: var(--dim); font-weight: 400; }
+  .bar-track { background: var(--surface2); border-radius: 3px; height: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 3px; transition: width 0.35s ease; }
+  .remaining { display: flex; gap: 10px; margin-top: 14px; }
+  .remaining-card { flex: 1; background: var(--surface2); border-radius: 6px; padding: 9px 12px; border-left: 3px solid var(--border2); }
+  .remaining-card.over { border-left-color: var(--red); }
+  .remaining-card.low { border-left-color: var(--amber); }
+  .rc-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .rc-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
+  .rc-value.over { color: var(--red); }
+  .rc-value.low { color: var(--amber); }
+  .rc-tag { font-size: 10px; color: var(--red); margin-left: 4px; }
+  .main { max-width: 520px; margin: 0 auto; padding: 14px 16px 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .tab { background: none; border: none; color: var(--dim); font-size: 13px; font-family: inherit; padding: 10px 16px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  .tab.active { color: var(--text); border-bottom-color: var(--blue); }
+  .meal-card { background: var(--surface); border-radius: 8px; margin-bottom: 10px; border: 1px solid var(--border); overflow: hidden; }
+  .meal-header { padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; user-select: none; }
+  .meal-header:hover { background: #1c1c1c; }
+  .meal-header-left { display: flex; align-items: center; gap: 10px; }
+  .meal-name { font-size: 15px; font-weight: 600; }
+  .meal-badge { font-size: 11px; color: var(--dim); background: #222; padding: 2px 8px; border-radius: 10px; }
+  .meal-header-right { display: flex; align-items: center; gap: 12px; }
+  .meal-summary { font-size: 13px; color: var(--muted); }
+  .meal-summary .prot { color: var(--green); }
+  .chevron { color: var(--dimmer); font-size: 10px; }
+  .meal-body { border-top: 1px solid var(--border); padding: 12px 16px 16px; }
+  .entry { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--surface2); }
+  .entry-name { font-size: 13px; font-weight: 500; }
+  .entry-macros { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .entry-remove { background: none; border: none; color: var(--dimmer); cursor: pointer; font-size: 18px; padding: 0 4px; }
+  .entry-remove:hover { color: var(--red); }
+
+  /* SEARCH UI */
+  .search-wrap { position: relative; margin-top: 12px; }
+  .search-input { width: 100%; background: #111; border: 1px solid var(--border2); border-radius: 6px; color: var(--text); padding: 10px 12px; font-size: 13px; outline: none; font-family: inherit; }
+  .search-input:focus { border-color: var(--blue); }
+  .search-input::placeholder { color: var(--dimmer); }
+  .search-results { position: absolute; top: 100%; left: 0; right: 0; background: #1a1a1a; border: 1px solid var(--border2); border-radius: 6px; margin-top: 4px; max-height: 260px; overflow-y: auto; z-index: 100; }
+  .search-result { padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover { background: var(--surface2); }
+  .sr-name { font-size: 13px; font-weight: 500; }
+  .sr-macros { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .sr-serving { font-size: 11px; color: var(--blue); margin-top: 1px; }
+  .no-results { padding: 12px; font-size: 13px; color: var(--dim); text-align: center; }
+
+  /* MANUAL ENTRY */
+  .manual-toggle { font-size: 12px; color: var(--blue); cursor: pointer; margin-top: 8px; display: inline-block; }
+  .manual-form { background: var(--surface2); border-radius: 6px; padding: 12px; margin-top: 8px; }
+  .manual-form-title { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; }
+  .manual-row { display: flex; gap: 6px; margin-bottom: 8px; }
+  .manual-input { flex: 1; background: #111; border: 1px solid var(--border2); border-radius: 5px; color: var(--text); padding: 8px 10px; font-size: 13px; font-family: inherit; outline: none; }
+  .manual-input:focus { border-color: var(--blue); }
+  .manual-input::placeholder { color: var(--dimmer); font-size: 11px; }
+  .manual-macros { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+  .add-manual-btn { background: var(--green); border: none; border-radius: 5px; color: #000; font-size: 12px; font-weight: 700; padding: 8px 14px; cursor: pointer; font-family: inherit; }
+
+  /* SERVING SELECTOR */
+  .serving-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+  .serving-modal { background: var(--surface); border-radius: 12px 12px 0 0; padding: 20px 16px 32px; width: 100%; max-width: 520px; }
+  .sm-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .sm-macros { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+  .sm-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .sm-label { font-size: 13px; color: var(--muted); width: 80px; flex-shrink: 0; }
+  .sm-input { flex: 1; background: #111; border: 1px solid var(--border2); border-radius: 6px; color: var(--text); padding: 10px 12px; font-size: 15px; font-family: inherit; outline: none; text-align: center; }
+  .sm-input:focus { border-color: var(--blue); }
+  .sm-preview { background: var(--surface2); border-radius: 6px; padding: 10px 12px; margin-bottom: 16px; display: flex; justify-content: space-between; }
+  .sm-preview-item { text-align: center; }
+  .sm-preview-val { font-size: 16px; font-weight: 700; }
+  .sm-preview-label { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+  .sm-add-btn { width: 100%; background: var(--green); border: none; border-radius: 8px; color: #000; font-size: 15px; font-weight: 700; padding: 14px; cursor: pointer; font-family: inherit; }
+  .sm-cancel { width: 100%; background: none; border: none; color: var(--muted); font-size: 13px; padding: 10px; cursor: pointer; font-family: inherit; margin-top: 6px; }
+
+  /* HISTORY */
+  .history-day { background: var(--surface); border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; overflow: hidden; }
+  .history-day-header { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+  .history-day-header:hover { background: #1c1c1c; }
+  .history-date { font-size: 14px; font-weight: 600; }
+  .history-totals { font-size: 12px; color: var(--muted); }
+  .history-totals .hp { color: var(--green); }
+  .history-entries { border-top: 1px solid var(--border); }
+  .history-meal-group { padding: 10px 16px; border-bottom: 1px solid var(--surface2); }
+  .history-meal-group:last-child { border-bottom: none; }
+  .history-meal-label { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .history-entry { font-size: 12px; color: var(--muted); padding: 2px 0; }
+  .empty-history { text-align: center; color: var(--dim); padding: 40px 16px; font-size: 13px; }
+  .clear-btn { background: none; border: 1px solid var(--border2); color: var(--dim); font-size: 11px; padding: 6px 12px; border-radius: 4px; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; font-family: inherit; }
+  .clear-btn:hover { border-color: var(--red); color: var(--red); }
+
+  .input-hint { font-size: 11px; color: var(--dimmer); margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="header-top">
+      <div>
+        <div class="eyebrow">Due Season</div>
+        <h1>Macro Tracker</h1>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px;">
+        <div class="date-nav">
+          <button onclick="changeDay(-1)">&#8592;</button>
+          <div class="date-label" id="date-label"></div>
+          <button onclick="changeDay(1)" id="next-btn">&#8594;</button>
+        </div>
+        <button class="clear-btn" onclick="clearCurrentDay()">Clear day</button>
+      </div>
+    </div>
+    <div class="macro-bars" id="macro-bars"></div>
+    <div class="remaining" id="remaining"></div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('today',this)">Today</button>
+    <button class="tab" onclick="switchTab('history',this)">History</button>
+  </div>
+  <div id="today-view"></div>
+  <div id="history-view" style="display:none;"></div>
+</div>
+
+<!-- Serving modal -->
+<div class="serving-modal-overlay" id="serving-modal" style="display:none;" onclick="closeModal(event)">
+  <div class="serving-modal">
+    <div class="sm-title" id="sm-food-name"></div>
+    <div class="sm-macros" id="sm-food-base"></div>
+    <div class="sm-row">
+      <span class="sm-label">Servings</span>
+      <input class="sm-input" type="number" id="sm-qty" value="1" step="0.25" min="0.25" oninput="updateModalPreview()">
+    </div>
+    <div class="sm-preview" id="sm-preview"></div>
+    <button class="sm-add-btn" onclick="confirmAdd()">Add to log</button>
+    <button class="sm-cancel" onclick="document.getElementById('serving-modal').style.display='none'">Cancel</button>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// FOOD DATABASE
+// Format: [name, calories, protein(g), carbs(g), fat(g), serving_desc]
+// All values per serving as described
+// ================================================================
+const FOODS = [
+  // EGGS & DAIRY
+  ["Egg, large fried",90,6,0,7,"1 egg"],
+  ["Egg, large scrambled",100,7,1,7,"1 egg"],
+  ["Egg, large boiled",78,6,1,5,"1 egg"],
+  ["Egg, large poached",71,6,0,5,"1 egg"],
+  ["Egg whites",17,4,0,0,"1 egg white"],
+  ["Milk, whole",149,8,12,8,"1 cup"],
+  ["Milk, 2%",122,8,11,5,"1 cup"],
+  ["Milk, skim",83,8,12,0,"1 cup"],
+  ["Butter",102,0,0,12,"1 tbsp"],
+  ["Cheddar cheese",113,7,0,9,"1 oz"],
+  ["American cheese",94,5,2,7,"1 slice"],
+  ["Mozzarella",85,6,1,6,"1 oz"],
+  ["Cottage cheese, 2%",90,12,5,2,"1/2 cup"],
+  ["Greek yogurt, plain whole",100,9,6,5,"5.3 oz"],
+  ["Greek yogurt, plain nonfat",80,14,6,0,"5.3 oz"],
+  ["Sour cream",60,1,2,6,"2 tbsp"],
+  ["Cream cheese",99,2,2,10,"2 tbsp"],
+  ["Heavy cream",51,0,0,5,"1 tbsp"],
+  ["Half and half",40,1,1,3,"2 tbsp"],
+  ["Whey protein powder",120,25,3,2,"1 scoop"],
+  ["Protein shake, mixed with water",130,25,5,2,"1 scoop in water"],
+  ["Protein shake, mixed with milk",220,33,12,5,"1 scoop in 6 oz 2% milk (Dymatize)"],
+
+  // MEAT - BEEF
+  ["Ground beef, 80/20 cooked",218,15,0,17,"3 oz"],
+  ["Ground beef, 90/10 cooked",184,22,0,10,"3 oz"],
+  ["Steak, ribeye",220,23,0,14,"3 oz"],
+  ["Steak, sirloin",165,26,0,6,"3 oz"],
+  ["Steak, T-bone",210,21,0,14,"3 oz"],
+  ["Hamburger patty 80/20",290,20,0,23,"4 oz patty"],
+  ["Meatloaf",294,23,15,14,"1 slice (3 oz)"],
+  ["Pot roast, beef",180,24,0,9,"3 oz"],
+
+  // MEAT - PORK
+  ["Bacon, pan fried",43,3,0,3,"1 strip"],
+  ["Bacon, thick cut",60,5,0,5,"1 strip"],
+  ["Sausage, pork link",80,4,1,7,"1 link"],
+  ["Sausage, pork patty",100,6,1,8,"1 patty"],
+  ["Sausage, country gravy",190,7,16,10,"1/2 cup"],
+  ["Ham, sliced deli",46,7,1,2,"2 slices"],
+  ["Ham, baked bone-in",145,21,0,6,"3 oz"],
+  ["Pork chop, bone-in grilled",187,23,0,10,"3 oz"],
+  ["Pork tenderloin",122,22,0,3,"3 oz"],
+  ["Pulled pork, BBQ",240,20,12,10,"3 oz"],
+  ["Pork ribs, BBQ",292,23,13,17,"3 oz"],
+
+  // MEAT - CHICKEN & TURKEY
+  ["Chicken breast, grilled",165,31,0,4,"3.5 oz"],
+  ["Chicken breast, fried",246,29,8,11,"3.5 oz"],
+  ["Chicken thigh, bone-in baked",209,26,0,11,"3.5 oz"],
+  ["Chicken thigh, boneless baked",184,24,0,9,"3.5 oz"],
+  ["Chicken leg, baked",191,26,0,9,"3.5 oz"],
+  ["Chicken wing, fried",99,9,0,7,"1 wing"],
+  ["Chicken tenders, fried",260,21,13,13,"3 oz"],
+  ["Rotisserie chicken, breast",148,26,0,4,"3 oz"],
+  ["Rotisserie chicken, thigh",163,21,0,8,"3 oz"],
+  ["Turkey breast, sliced deli",60,12,2,1,"2 oz"],
+  ["Turkey burger patty",180,22,0,10,"4 oz"],
+  ["Ground turkey, cooked",200,23,0,11,"3.5 oz"],
+
+  // FISH & SEAFOOD
+  ["Tuna, canned in water",100,22,0,1,"3 oz"],
+  ["Tuna, canned in oil",168,25,0,7,"3 oz"],
+  ["Salmon, baked",175,25,0,8,"3 oz"],
+  ["Tilapia, baked",110,23,0,2,"3 oz"],
+  ["Catfish, fried",195,15,7,11,"3 oz"],
+  ["Shrimp, boiled",84,18,1,1,"3 oz"],
+  ["Shrimp, fried",206,18,10,9,"3 oz"],
+  ["Cod, baked",89,19,0,1,"3 oz"],
+
+  // SOUTHERN COOKING STAPLES
+  ["Biscuit, homemade",212,4,27,9,"1 medium"],
+  ["Biscuit, canned/Pillsbury",180,4,24,7,"1 biscuit"],
+  ["Biscuit with butter and jelly",320,5,42,14,"1 biscuit"],
+  ["Cornbread, homemade",173,4,28,5,"1 piece"],
+  ["Cornbread, cast iron",198,4,30,7,"1 piece"],
+  ["Fried chicken, breast",364,35,13,19,"1 breast"],
+  ["Fried chicken, thigh",280,26,9,16,"1 thigh"],
+  ["Fried chicken, drumstick",193,16,6,11,"1 drumstick"],
+  ["Country fried steak with gravy",480,22,32,28,"1 serving"],
+  ["Chicken and dumplings",280,22,24,9,"1 cup"],
+  ["Beef stew",220,16,18,8,"1 cup"],
+  ["Chicken pot pie",540,22,42,30,"1 serving"],
+  ["Meatloaf with ketchup glaze",294,23,16,14,"1 slice"],
+  ["Pinto beans, cooked",245,15,45,1,"1 cup"],
+  ["Black-eyed peas, cooked",200,13,36,1,"1 cup"],
+  ["Lima beans, cooked",216,15,39,1,"1 cup"],
+  ["Green beans, cooked",44,2,10,0,"1 cup"],
+  ["Green beans, with bacon",80,3,10,3,"1/2 cup"],
+  ["Collard greens, cooked",49,4,9,1,"1 cup"],
+  ["Collard greens with ham hock",120,8,9,5,"1 cup"],
+  ["Turnip greens, cooked",29,2,6,0,"1 cup"],
+  ["Fried okra",173,2,20,9,"1/2 cup"],
+  ["Boiled okra",36,2,7,0,"1/2 cup"],
+  ["Sweet potato, baked",103,2,24,0,"1 medium"],
+  ["Sweet potato, candied",250,2,51,4,"1/2 cup"],
+  ["Mashed potatoes, homemade",237,4,35,9,"1 cup"],
+  ["Mashed potatoes with gravy",290,5,40,12,"1 cup"],
+  ["Mac and cheese, homemade",390,14,44,17,"1 cup"],
+  ["Mac and cheese, Kraft",250,9,47,3,"1 cup prepared"],
+  ["Fried squash",130,2,15,7,"1/2 cup"],
+  ["Fried green tomatoes",150,3,16,8,"2 slices"],
+  ["Coleslaw, creamy",150,1,14,10,"1/2 cup"],
+  ["Potato salad, southern",280,3,24,18,"1/2 cup"],
+  ["Deviled eggs",63,4,1,5,"2 halves"],
+  ["Tomato, sliced",22,1,5,0,"1 medium"],
+  ["Tomato, fried",85,1,9,5,"1 slice"],
+  ["Gravy, brown",37,1,4,2,"1/4 cup"],
+  ["Gravy, white/country",75,2,8,4,"1/4 cup"],
+  ["Butter beans, cooked",209,13,38,1,"1 cup"],
+
+  // STARCHES & GRAINS
+  ["White rice, cooked",206,4,45,0,"1 cup"],
+  ["Brown rice, cooked",216,5,45,2,"1 cup"],
+  ["Pasta, cooked",220,8,43,1,"1 cup"],
+  ["Bread, white",79,3,15,1,"1 slice"],
+  ["Bread, wheat",69,4,12,1,"1 slice"],
+  ["Bread, sourdough",88,4,17,0,"1 slice"],
+  ["Bagel, plain",270,11,53,2,"1 medium"],
+  ["English muffin",134,4,26,1,"1 muffin"],
+  ["Tortilla, flour 10-inch",218,6,35,6,"1 tortilla"],
+  ["Tortilla, corn 6-inch",58,1,12,1,"1 tortilla"],
+  ["Oatmeal, cooked",166,6,28,4,"1 cup"],
+  ["Grits, cooked",182,4,38,1,"1 cup"],
+  ["Grits with butter and cheese",280,7,38,11,"1 cup"],
+  ["Cream of wheat",133,4,28,1,"1 cup"],
+  ["Pancakes, homemade",175,5,25,6,"2 medium"],
+  ["Waffles, homemade",218,6,25,10,"1 waffle"],
+  ["French toast",263,8,34,11,"2 slices"],
+  ["Crackers, saltine",65,1,11,2,"6 crackers"],
+  ["Crackers, Ritz",79,1,10,4,"5 crackers"],
+  ["Potato chips, regular",152,2,15,10,"1 oz"],
+  ["Ruffles, original",160,2,14,11,"1 oz"],
+  ["Ruffles, queso",160,2,15,10,"1 oz (about 11 chips)"],
+  ["Doritos, nacho cheese",140,2,18,7,"1 oz"],
+  ["Pretzels",108,3,23,1,"1 oz"],
+  ["Popcorn, air popped",31,1,6,0,"1 cup"],
+  ["Popcorn, microwave butter",64,1,7,4,"1 cup"],
+
+  // VEGETABLES
+  ["Broccoli, cooked",55,4,11,1,"1 cup"],
+  ["Carrots, raw",52,1,12,0,"1 cup"],
+  ["Corn, cooked",177,5,41,2,"1 cup"],
+  ["Corn on the cob",111,4,26,1,"1 ear"],
+  ["Peas, cooked",134,9,25,0,"1 cup"],
+  ["Spinach, cooked",41,5,7,0,"1 cup"],
+  ["Salad, side garden",20,1,4,0,"1 cup"],
+  ["Salad, Caesar",180,5,9,14,"2 cups"],
+  ["Cucumber",16,1,4,0,"1 cup"],
+  ["Bell pepper",31,1,7,0,"1 medium"],
+  ["Onion, raw",64,2,15,0,"1 medium"],
+  ["Mushrooms, cooked",44,3,8,1,"1 cup"],
+  ["Baked potato, plain",161,4,37,0,"1 medium"],
+  ["Baked potato loaded",410,9,51,18,"1 medium"],
+  ["French fries, restaurant",365,4,48,17,"medium serving"],
+  ["Hash browns, pan fried",151,2,17,9,"1/2 cup"],
+
+  // FRUIT
+  ["Apple",95,0,25,0,"1 medium"],
+  ["Banana",105,1,27,0,"1 medium"],
+  ["Orange",62,1,15,0,"1 medium"],
+  ["Grapes",62,1,16,0,"1 cup"],
+  ["Strawberries",49,1,12,0,"1 cup"],
+  ["Watermelon",86,2,22,0,"2 cups"],
+  ["Peach",59,1,14,0,"1 medium"],
+
+  // FAST FOOD - McDONALD'S
+  ["McDonald's Big Mac",550,25,46,30,"1 burger"],
+  ["McDonald's Quarter Pounder with Cheese",740,46,43,42,"1 burger"],
+  ["McDonald's McDouble",400,22,33,20,"1 burger"],
+  ["McDonald's Double Cheeseburger",440,25,34,22,"1 burger"],
+  ["McDonald's McChicken",400,14,41,20,"1 sandwich"],
+  ["McDonald's Crispy Chicken Sandwich",470,27,46,20,"1 sandwich"],
+  ["McDonald's 10pc McNuggets",410,24,26,24,"10 pieces"],
+  ["McDonald's Large Fries",490,7,66,23,"1 large"],
+  ["McDonald's Medium Fries",320,4,44,15,"1 medium"],
+  ["McDonald's Egg McMuffin",310,17,30,13,"1 sandwich"],
+  ["McDonald's Sausage McMuffin with Egg",480,21,30,31,"1 sandwich"],
+  ["McDonald's Hotcakes",590,14,102,15,"3 hotcakes"],
+  ["McDonald's Big Breakfast",760,28,58,48,"1 serving"],
+
+  // FAST FOOD - BURGER KING
+  ["Burger King Whopper",660,28,49,40,"1 burger"],
+  ["Burger King Double Whopper",900,46,50,58,"1 burger"],
+  ["Burger King Chicken Sandwich",660,36,51,35,"1 sandwich"],
+  ["Burger King Chicken Fries",280,19,19,13,"9 pieces"],
+  ["Burger King Onion Rings, medium",410,5,53,20,"1 medium"],
+
+  // FAST FOOD - CHICK-FIL-A
+  ["Chick-fil-A Chicken Sandwich",470,29,52,19,"1 sandwich"],
+  ["Chick-fil-A Deluxe Sandwich",520,33,52,22,"1 sandwich"],
+  ["Chick-fil-A Spicy Sandwich",550,32,53,24,"1 sandwich"],
+  ["Chick-fil-A 8pc Nuggets",260,28,12,12,"8 nuggets"],
+  ["Chick-fil-A Waffle Fries, medium",420,5,58,20,"1 medium"],
+  ["Chick-fil-A Grilled Chicken Sandwich",380,31,40,10,"1 sandwich"],
+
+  // FAST FOOD - WENDY'S
+  ["Wendy's Dave's Single",570,29,40,32,"1 burger"],
+  ["Wendy's Dave's Double",840,51,40,52,"1 burger"],
+  ["Wendy's Baconator",940,62,40,59,"1 burger"],
+  ["Wendy's Spicy Chicken Sandwich",500,33,43,22,"1 sandwich"],
+  ["Wendy's Frosty, medium",430,11,73,11,"1 medium"],
+
+  // FAST FOOD - SUBWAY
+  ["Subway 6-inch Turkey Breast",280,18,46,4,"1 sandwich"],
+  ["Subway 6-inch Chicken Teriyaki",370,24,57,5,"1 sandwich"],
+  ["Subway 6-inch Tuna",530,21,45,28,"1 sandwich"],
+  ["Subway Footlong Turkey",560,36,92,8,"1 footlong"],
+  ["Subway Footlong BMT",740,40,93,25,"1 footlong"],
+
+  // FAST FOOD - TACO BELL
+  ["Taco Bell Crunchy Taco",170,8,13,9,"1 taco"],
+  ["Taco Bell Soft Taco",180,9,21,7,"1 taco"],
+  ["Taco Bell Burrito Supreme",390,17,52,14,"1 burrito"],
+  ["Taco Bell Crunchwrap Supreme",530,20,72,20,"1 item"],
+  ["Taco Bell Nachos BellGrande",770,20,82,38,"1 order"],
+
+  // PIZZA
+  ["Pizza, cheese, thin crust",200,9,21,9,"1 slice"],
+  ["Pizza, cheese, hand tossed",266,11,33,10,"1 slice"],
+  ["Pizza, pepperoni, thin crust",230,10,21,12,"1 slice"],
+  ["Pizza, pepperoni, hand tossed",298,13,33,13,"1 slice"],
+  ["Pizza, meat lovers",380,18,34,19,"1 slice"],
+  ["Pizza Hut cheese pizza",260,11,31,10,"1 slice medium"],
+  ["Domino's cheese pizza",200,8,26,7,"1 slice medium"],
+
+  // SANDWICHES & WRAPS
+  ["BLT sandwich",390,15,38,20,"1 sandwich"],
+  ["Club sandwich",590,34,44,29,"1 sandwich"],
+  ["Grilled cheese",378,15,30,24,"1 sandwich"],
+  ["PB&J sandwich",380,12,52,16,"1 sandwich"],
+  ["Peanut butter sandwich",290,10,37,13,"1 sandwich"],
+  ["Turkey and cheese sandwich",340,22,34,11,"1 sandwich"],
+  ["Chicken wrap, grilled",450,36,42,12,"1 wrap"],
+
+  // SOUPS
+  ["Chicken noodle soup",75,6,9,2,"1 cup"],
+  ["Tomato soup, canned",90,2,20,0,"1 cup"],
+  ["Beef vegetable soup",80,6,10,2,"1 cup"],
+  ["Chili with beans",287,22,30,9,"1 cup"],
+  ["Chili without beans",250,24,14,12,"1 cup"],
+
+  // SNACKS & SWEETS
+  ["Jelly, regular",56,0,14,0,"1 tbsp"],
+  ["Jam, regular",56,0,14,0,"1 tbsp"],
+  ["Peanut butter",94,4,3,8,"1 tbsp"],
+  ["Honey",64,0,17,0,"1 tbsp"],
+  ["Chocolate chip cookies",148,2,20,7,"2 cookies"],
+  ["Oreos",140,1,21,6,"3 cookies"],
+  ["Granola bar, Nature Valley",190,4,29,7,"1 bar"],
+  ["Protein bar, Quest",200,21,22,8,"1 bar"],
+  ["Protein bar, Kind",250,12,24,15,"1 bar"],
+  ["Rice cake, plain",35,1,7,0,"1 cake"],
+  ["Mixed nuts",170,5,7,15,"1 oz"],
+  ["Almonds",164,6,6,14,"1 oz"],
+  ["Beef jerky",80,9,4,2,"1 oz"],
+
+  // CONDIMENTS & EXTRAS
+  ["Ketchup",19,0,5,0,"1 tbsp"],
+  ["Mustard",3,0,0,0,"1 tsp"],
+  ["Mayonnaise",94,0,0,10,"1 tbsp"],
+  ["Ranch dressing",73,1,1,8,"1 tbsp"],
+  ["BBQ sauce",29,0,7,0,"1 tbsp"],
+  ["Hot sauce",1,0,0,0,"1 tsp"],
+  ["Olive oil",119,0,0,14,"1 tbsp"],
+  ["Vegetable oil",120,0,0,14,"1 tbsp"],
+  ["Salsa",10,0,2,0,"2 tbsp"],
+  ["Sour cream",60,1,2,6,"2 tbsp"],
+  ["Guacamole",45,1,2,4,"2 tbsp"],
+
+  // DRINKS (non-water, non-zero)
+  ["Pepsi Zero Sugar",0,0,0,0,"12 oz can"],
+  ["Cherry Coke Zero",0,0,0,0,"12 oz can"],
+  ["Coke Zero",0,0,0,0,"12 oz can"],
+  ["Diet Pepsi",0,0,0,0,"12 oz can"],
+  ["Diet Coke",0,0,0,0,"12 oz can"],
+  ["Coca-Cola regular",140,0,39,0,"12 oz can"],
+  ["Pepsi regular",150,0,41,0,"12 oz can"],
+  ["Orange juice",112,2,26,0,"1 cup"],
+  ["Apple juice",114,0,28,0,"1 cup"],
+  ["Sweet tea",120,0,30,0,"16 oz"],
+  ["Unsweet tea",2,0,0,0,"16 oz"],
+  ["Gatorade",140,0,36,0,"20 oz"],
+  ["Coffee, black",2,0,0,0,"1 cup"],
+  ["Coffee with cream and sugar",60,1,9,2,"1 cup"],
+  ["Beer, regular",153,1,13,0,"12 oz"],
+  ["Beer, light",103,1,6,0,"12 oz"],
+  ["Wine, red",125,0,4,0,"5 oz"],
+
+  // BREAKFAST ITEMS
+  ["Cereal, Frosted Flakes",110,1,26,0,"3/4 cup"],
+  ["Cereal, Cheerios",100,3,20,2,"1 cup"],
+  ["Cereal, Raisin Bran",190,5,46,1,"1 cup"],
+  ["Pop-Tart, frosted",200,2,37,5,"1 pastry"],
+  ["Toaster strudel",190,2,26,8,"1 pastry"],
+  ["Donut, glazed",269,3,31,15,"1 donut"],
+  ["Muffin, blueberry",313,5,54,9,"1 large"],
+  ["Cinnamon roll",309,5,54,9,"1 roll"],
+  ["Breakfast burrito, homemade",450,22,42,20,"1 burrito"],
+
+  // RESTAURANT - APPLEBEE'S / CASUAL DINING
+  ["Applebee's 8oz sirloin",340,42,6,16,"1 steak"],
+  ["Applebee's classic burger",980,55,72,52,"1 burger"],
+  ["Applebee's boneless wings",700,42,57,29,"basket"],
+  ["Cracker Barrel meatloaf",490,30,37,23,"1 serving"],
+  ["Cracker Barrel chicken tenders",520,36,36,24,"1 serving"],
+  ["IHOP buttermilk pancakes",590,14,96,16,"3 pancakes"],
+  ["Denny's Grand Slam",640,35,65,27,"1 serving"],
+  ["Waffle House scattered smothered covered",790,28,89,36,"1 plate"],
+  ["Waffle House waffle",350,8,52,13,"1 waffle"],
+  ["Waffle House eggs and bacon",320,24,2,25,"2 eggs 3 strips"],
+
+  // DELI & PREPARED
+  ["Rotisserie chicken, whole breast",280,51,0,7,"1/2 breast"],
+  ["Lunchmeat, roast beef",70,10,2,2,"2 oz"],
+  ["Lunchmeat, salami",110,6,1,9,"2 oz"],
+  ["Lunchmeat, bologna",90,4,2,8,"2 oz"],
+  ["Hot dog, beef",186,6,2,17,"1 frank"],
+  ["Hot dog with bun",270,10,22,16,"1 hot dog"],
+  ["Bratwurst",260,12,2,22,"1 link"],
+
+  // MISC COMMONLY EATEN
+  ["Mixed vegetables, frozen cooked",60,3,12,0,"1 cup"],
+  ["Beans and rice",330,13,63,2,"1 cup"],
+  ["Nachos with cheese",346,9,36,19,"1 serving"],
+  ["Quesadilla, cheese",460,21,40,23,"1 large"],
+  ["Chips and queso",380,10,40,20,"1 serving"],
+  ["Hummus with pita",280,9,37,11,"1 serving"],
+];
+
+// ================================================================
+// STATE & STORAGE
+// ================================================================
+const TARGETS = { calories: 1850, protein: 190, carbs: 150, fat: 70 };
+const MEALS = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+const STORAGE_KEY = 'macro_tracker_v2';
+
+let currentDateOffset = 0;
+let expandedMeals = new Set(['Breakfast']);
+let expandedHistoryDays = new Set();
+let currentTab = 'today';
+let searchTimers = {};
+let pendingFood = null; // food being configured in modal
+let pendingMeal = null;
+let showManual = {};
+
+function getStorage() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; }
+}
+function saveStorage(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+
+function dateKey(offset = 0) {
+  const d = new Date(); d.setDate(d.getDate() + offset);
+  return d.toISOString().slice(0, 10);
+}
+function getDayLog(offset = 0) {
+  const s = getStorage(); const k = dateKey(offset);
+  if (!s[k]) { s[k] = MEALS.map(m => ({ meal: m, entries: [] })); saveStorage(s); }
+  return s[k];
+}
+function saveDayLog(log, offset = 0) {
+  const s = getStorage(); s[dateKey(offset)] = log; saveStorage(s);
+}
+
+function calcTotals(log) {
+  return log.reduce((a, { entries }) => {
+    entries.forEach(e => { a.calories += e.calories||0; a.protein += e.protein||0; a.carbs += e.carbs||0; a.fat += e.fat||0; });
+    return a;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+}
+function calcMealTotals(entries) {
+  return entries.reduce((a, e) => ({ calories: a.calories+(e.calories||0), protein: a.protein+(e.protein||0), carbs: a.carbs+(e.carbs||0), fat: a.fat+(e.fat||0) }), {calories:0,protein:0,carbs:0,fat:0});
+}
+
+// ================================================================
+// SEARCH
+// ================================================================
+function searchFoods(query) {
+  if (!query || query.length < 2) return [];
+  const q = query.toLowerCase();
+  const terms = q.split(' ').filter(t => t.length > 1);
+  const scored = FOODS.map(f => {
+    const name = f[0].toLowerCase();
+    let score = 0;
+    if (name === q) score += 100;
+    else if (name.startsWith(q)) score += 50;
+    else if (name.includes(q)) score += 30;
+    terms.forEach(t => { if (name.includes(t)) score += 10; });
+    return { score, food: f };
+  }).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
+  return scored.slice(0, 12).map(x => x.food);
+}
+
+// ================================================================
+// RENDER HEADER
+// ================================================================
+function renderHeader() {
+  const log = getDayLog(currentDateOffset);
+  const totals = calcTotals(log);
+  const label = document.getElementById('date-label');
+  label.textContent = currentDateOffset === 0 ? 'Today' : currentDateOffset === -1 ? 'Yesterday' : (() => { const d = new Date(); d.setDate(d.getDate()+currentDateOffset); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); })();
+  label.className = 'date-label' + (currentDateOffset === 0 ? ' today' : '');
+  document.getElementById('next-btn').disabled = currentDateOffset >= 0;
+
+  const bars = [
+    {key:'calories',label:'Calories',color:'#4a9eff',unit:''},
+    {key:'protein',label:'Protein',color:'#52c97a',unit:'g'},
+    {key:'carbs',label:'Carbs',color:'#f0a830',unit:'g'},
+    {key:'fat',label:'Fat',color:'#c97adb',unit:'g'},
+  ];
+  document.getElementById('macro-bars').innerHTML = bars.map(({key,label,color,unit}) => {
+    const val = Math.round(totals[key]); const target = TARGETS[key];
+    const pct = Math.min((val/target)*100,100); const over = val > target;
+    return `<div class="macro-row"><div class="macro-row-top"><span class="macro-label">${label}</span><span class="macro-value" style="color:${over?'var(--red)':'var(--text)'}">${val}<span class="target">/${target}${unit}</span></span></div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${over?'var(--red)':color}"></div></div></div>`;
+  }).join('');
+
+  const remCal = TARGETS.calories - Math.round(totals.calories);
+  const remProt = TARGETS.protein - Math.round(totals.protein);
+  document.getElementById('remaining').innerHTML = [
+    {label:'Calories left',value:remCal,unit:''},
+    {label:'Protein left',value:remProt,unit:'g'}
+  ].map(({label,value,unit}) => {
+    const over = value < 0; const low = !over && value < 100;
+    return `<div class="remaining-card ${over?'over':low?'low':''}"><div class="rc-label">${label}</div><div class="rc-value ${over?'over':low?'low':''}">${over?'+'+Math.abs(value):value}${unit}${over?'<span class="rc-tag">over</span>':''}</div></div>`;
+  }).join('');
+}
+
+// ================================================================
+// RENDER TODAY
+// ================================================================
+function renderToday() {
+  const log = getDayLog(currentDateOffset);
+  document.getElementById('today-view').innerHTML = log.map(({meal, entries}) => {
+    const isOpen = expandedMeals.has(meal);
+    const mt = calcMealTotals(entries);
+    const manualVisible = showManual[meal];
+    const entriesHtml = entries.map((e, idx) => `
+      <div class="entry">
+        <div><div class="entry-name">${esc(e.name)}</div><div class="entry-macros">${Math.round(e.calories)} cal · ${Math.round(e.protein)}g P · ${Math.round(e.carbs)}g C · ${Math.round(e.fat)}g F</div></div>
+        <button class="entry-remove" onclick="removeEntry('${escA(meal)}',${idx})">×</button>
+      </div>`).join('');
+
+    return `<div class="meal-card">
+      <div class="meal-header" onclick="toggleMeal('${escA(meal)}')">
+        <div class="meal-header-left"><span class="meal-name">${meal}</span>${entries.length>0?`<span class="meal-badge">${entries.length} item${entries.length!==1?'s':''}</span>`:''}</div>
+        <div class="meal-header-right">${entries.length>0?`<span class="meal-summary">${Math.round(mt.calories)} cal · <span class="prot">${Math.round(mt.protein)}g P</span></span>`:''}<span class="chevron">${isOpen?'▲':'▼'}</span></div>
+      </div>
+      ${isOpen ? `<div class="meal-body">
+        ${entriesHtml}
+        <div class="search-wrap">
+          <input class="search-input" id="search-${escA(meal)}" type="text" placeholder="Search foods..." autocomplete="off" oninput="onSearch('${escA(meal)}')" />
+          <div class="search-results" id="results-${escA(meal)}" style="display:none;"></div>
+        </div>
+        <span class="manual-toggle" onclick="toggleManual('${escA(meal)}')">${manualVisible?'▲ Hide manual entry':'+ Enter manually'}</span>
+        ${manualVisible ? `<div class="manual-form">
+          <div class="manual-form-title">Manual Entry</div>
+          <div class="manual-row"><input class="manual-input" id="mname-${escA(meal)}" placeholder="Food name" type="text" style="flex:2"/></div>
+          <div class="manual-macros">
+            <input class="manual-input" id="mcal-${escA(meal)}" placeholder="Cal" type="number"/>
+            <input class="manual-input" id="mpro-${escA(meal)}" placeholder="Protein g" type="number"/>
+            <input class="manual-input" id="mcarb-${escA(meal)}" placeholder="Carbs g" type="number"/>
+            <input class="manual-input" id="mfat-${escA(meal)}" placeholder="Fat g" type="number"/>
+          </div>
+          <button class="add-manual-btn" onclick="addManual('${escA(meal)}')">Add</button>
+        </div>` : ''}
+        <div class="input-hint">Search by name — e.g. "fried egg", "chicken breast", "ruffles queso"</div>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ================================================================
+// SEARCH HANDLERS
+// ================================================================
+function onSearch(meal) {
+  clearTimeout(searchTimers[meal]);
+  searchTimers[meal] = setTimeout(() => {
+    const input = document.getElementById('search-' + meal);
+    const resultsEl = document.getElementById('results-' + meal);
+    if (!input || !resultsEl) return;
+    const q = input.value.trim();
+    if (q.length < 2) { resultsEl.style.display = 'none'; return; }
+    const results = searchFoods(q);
+    if (results.length === 0) {
+      resultsEl.innerHTML = `<div class="no-results">No match — use manual entry below</div>`;
+    } else {
+      resultsEl.innerHTML = results.map(f => `
+        <div class="search-result" onclick="selectFood('${escA(meal)}', ${FOODS.indexOf(f)})">
+          <div class="sr-name">${esc(f[0])}</div>
+          <div class="sr-macros">${f[1]} cal · ${f[2]}g P · ${f[3]}g C · ${f[4]}g F</div>
+          <div class="sr-serving">${esc(f[5])}</div>
+        </div>`).join('');
+    }
+    resultsEl.style.display = 'block';
+  }, 200);
+}
+
+function selectFood(meal, idx) {
+  pendingFood = FOODS[idx];
+  pendingMeal = meal;
+  document.getElementById('sm-food-name').textContent = pendingFood[0];
+  document.getElementById('sm-food-base').textContent = `Per serving (${pendingFood[5]}): ${pendingFood[1]} cal · ${pendingFood[2]}g P · ${pendingFood[3]}g C · ${pendingFood[4]}g F`;
+  document.getElementById('sm-qty').value = '1';
+  updateModalPreview();
+  document.getElementById('serving-modal').style.display = 'flex';
+  // hide results
+  const r = document.getElementById('results-' + meal);
+  if (r) r.style.display = 'none';
+}
+
+function updateModalPreview() {
+  if (!pendingFood) return;
+  const qty = parseFloat(document.getElementById('sm-qty').value) || 1;
+  const preview = [
+    {label:'Cal', val: Math.round(pendingFood[1]*qty)},
+    {label:'Protein', val: Math.round(pendingFood[2]*qty)+'g'},
+    {label:'Carbs', val: Math.round(pendingFood[3]*qty)+'g'},
+    {label:'Fat', val: Math.round(pendingFood[4]*qty)+'g'},
+  ];
+  document.getElementById('sm-preview').innerHTML = preview.map(p => `<div class="sm-preview-item"><div class="sm-preview-val">${p.val}</div><div class="sm-preview-label">${p.label}</div></div>`).join('');
+}
+
+function confirmAdd() {
+  if (!pendingFood || !pendingMeal) return;
+  const qty = parseFloat(document.getElementById('sm-qty').value) || 1;
+  const entry = {
+    name: pendingFood[0] + (qty !== 1 ? ` (×${qty})` : ''),
+    calories: Math.round(pendingFood[1]*qty),
+    protein: Math.round(pendingFood[2]*qty),
+    carbs: Math.round(pendingFood[3]*qty),
+    fat: Math.round(pendingFood[4]*qty),
+  };
+  addEntryToMeal(pendingMeal, entry);
+  document.getElementById('serving-modal').style.display = 'none';
+  pendingFood = null; pendingMeal = null;
+  // clear search
+  const input = document.getElementById('search-' + pendingMeal);
+  if (input) input.value = '';
+}
+
+function closeModal(e) {
+  if (e.target.id === 'serving-modal') document.getElementById('serving-modal').style.display = 'none';
+}
+
+function toggleManual(meal) {
+  showManual[meal] = !showManual[meal];
+  renderToday();
+}
+
+function addManual(meal) {
+  const name = document.getElementById('mname-' + meal)?.value.trim();
+  const cal = parseFloat(document.getElementById('mcal-' + meal)?.value) || 0;
+  const pro = parseFloat(document.getElementById('mpro-' + meal)?.value) || 0;
+  const carb = parseFloat(document.getElementById('mcarb-' + meal)?.value) || 0;
+  const fat = parseFloat(document.getElementById('mfat-' + meal)?.value) || 0;
+  if (!name) return;
+  addEntryToMeal(meal, { name, calories: cal, protein: pro, carbs: carb, fat });
+  showManual[meal] = false;
+}
+
+function addEntryToMeal(meal, entry) {
+  const log = getDayLog(currentDateOffset);
+  const m = log.find(x => x.meal === meal);
+  if (m) m.entries.push(entry);
+  saveDayLog(log, currentDateOffset);
+  renderAll();
+}
+
+function removeEntry(meal, idx) {
+  const log = getDayLog(currentDateOffset);
+  const m = log.find(x => x.meal === meal);
+  if (m) m.entries.splice(idx, 1);
+  saveDayLog(log, currentDateOffset);
+  renderAll();
+}
+
+function toggleMeal(meal) {
+  expandedMeals.has(meal) ? expandedMeals.delete(meal) : expandedMeals.add(meal);
+  renderToday();
+}
+
+// ================================================================
+// HISTORY
+// ================================================================
+function renderHistory() {
+  const storage = getStorage();
+  const today = dateKey(0);
+  const keys = Object.keys(storage).filter(k => k !== today).sort((a,b) => b.localeCompare(a)).slice(0, 30);
+  const view = document.getElementById('history-view');
+  if (keys.length === 0) { view.innerHTML = '<div class="empty-history">No history yet.</div>'; return; }
+  view.innerHTML = keys.map(key => {
+    const log = storage[key];
+    const totals = calcTotals(log);
+    const isOpen = expandedHistoryDays.has(key);
+    const d = new Date(key + 'T00:00:00');
+    const label = key === dateKey(-1) ? 'Yesterday' : d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const mealsHtml = log.filter(m => m.entries.length > 0).map(({meal, entries}) => `
+      <div class="history-meal-group">
+        <div class="history-meal-label">${meal}</div>
+        ${entries.map(e => `<div class="history-entry">${esc(e.name)} <span>— ${Math.round(e.calories)} cal, ${Math.round(e.protein)}g P</span></div>`).join('')}
+      </div>`).join('');
+    return `<div class="history-day">
+      <div class="history-day-header" onclick="toggleHistoryDay('${key}')">
+        <span class="history-date">${label}</span>
+        <span class="history-totals">${Math.round(totals.calories)} cal · <span class="hp">${Math.round(totals.protein)}g P</span></span>
+      </div>
+      ${isOpen ? `<div class="history-entries">${mealsHtml}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function toggleHistoryDay(key) {
+  expandedHistoryDays.has(key) ? expandedHistoryDays.delete(key) : expandedHistoryDays.add(key);
+  renderHistory();
+}
+
+// ================================================================
+// MISC
+// ================================================================
+function changeDay(delta) {
+  const n = currentDateOffset + delta;
+  if (n > 0) return;
+  currentDateOffset = n;
+  renderAll();
+}
+
+function clearCurrentDay() {
+  const label = currentDateOffset === 0 ? 'today' : currentDateOffset === -1 ? 'yesterday' : 'this day';
+  if (!confirm('Clear all entries for ' + label + '?')) return;
+  saveDayLog(MEALS.map(m => ({meal:m, entries:[]})), currentDateOffset);
+  renderAll();
+}
+
+function switchTab(tab, btn) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('today-view').style.display = tab === 'today' ? '' : 'none';
+  document.getElementById('history-view').style.display = tab === 'history' ? '' : 'none';
+  if (tab === 'history') renderHistory();
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escA(s) { return String(s).replace(/'/g,"\\'"); }
+
+function renderAll() { renderHeader(); currentTab === 'today' ? renderToday() : renderHistory(); }
+renderAll();
+</script>
+</body>
+</html>
