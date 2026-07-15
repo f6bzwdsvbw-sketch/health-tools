@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gym Training Program</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f0f0f; --surface: #181818; --surface2: #1e1e1e;
+    --border: #242424; --border2: #2e2e2e; --text: #f0f0f0;
+    --muted: #888; --dim: #555; --dimmer: #333;
+    --blue: #4a9eff; --green: #52c97a; --amber: #f0a830;
+    --purple: #c97adb; --red: #e05252;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, 'Helvetica Neue', sans-serif; min-height: 100vh; padding-bottom: 80px; font-size: 14px; line-height: 1.5; }
+
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 20px 16px 16px; position: sticky; top: 0; z-index: 20; }
+  .header-inner { max-width: 540px; margin: 0 auto; }
+  .eyebrow { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 3px; }
+  h1 { font-size: 20px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 12px; }
+  .week-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+  .week-tab { background: var(--surface2); border: 1px solid var(--border2); color: var(--muted); font-size: 12px; font-family: inherit; padding: 5px 12px; border-radius: 4px; cursor: pointer; }
+  .week-tab.active { background: var(--green); border-color: var(--green); color: #000; font-weight: 600; }
+
+  .main { max-width: 540px; margin: 0 auto; padding: 16px 16px 0; }
+
+  .phase-banner { background: var(--surface2); border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; border-left: 3px solid var(--green); }
+  .phase-title { font-size: 13px; font-weight: 700; color: var(--green); margin-bottom: 4px; }
+  .phase-desc { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+  .schedule { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 20px; }
+  .schedule-day { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 4px; text-align: center; }
+  .schedule-day.active-day { border-color: var(--green); }
+  .schedule-day.rest-day { opacity: 0.5; }
+  .sd-label { font-size: 9px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .sd-type { font-size: 10px; font-weight: 600; }
+  .schedule-day.active-day .sd-type { color: var(--green); }
+  .schedule-day.rest-day .sd-type { color: var(--dim); }
+
+  .day-section { margin-bottom: 24px; }
+  .day-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .day-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; padding: 3px 10px; border-radius: 3px; }
+  .day-tag.push { background: var(--blue); color: #fff; }
+  .day-tag.pull { background: var(--purple); color: #fff; }
+  .day-tag.legs { background: var(--amber); color: #000; }
+  .day-tag.upper { background: var(--green); color: #000; }
+  .day-tag.lower { background: var(--red); color: #fff; }
+  .day-title { font-size: 16px; font-weight: 700; }
+
+  .exercise-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+  .exercise-header { padding: 12px 14px; display: flex; justify-content: space-between; align-items: flex-start; cursor: pointer; user-select: none; }
+  .exercise-header:hover { background: #1c1c1c; }
+  .ex-left { flex: 1; }
+  .ex-name { font-size: 14px; font-weight: 600; margin-bottom: 3px; }
+  .ex-sets { font-size: 12px; color: var(--muted); }
+  .ex-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: 12px; }
+  .ex-done { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border2); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; color: transparent; transition: all 0.15s; flex-shrink: 0; }
+  .ex-done.checked { background: var(--green); border-color: var(--green); color: #000; }
+  .chevron { color: var(--dim); font-size: 10px; }
+
+  .exercise-body { border-top: 1px solid var(--border); padding: 12px 14px; font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .note { background: var(--surface2); border-radius: 5px; padding: 8px 10px; margin-top: 8px; font-size: 12px; color: var(--dim); border-left: 2px solid var(--border2); }
+  .note.warn { border-left-color: var(--amber); color: var(--amber); }
+  .note.good { border-left-color: var(--green); color: var(--green); }
+
+  .set-log { margin-top: 10px; }
+  .set-log-title { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .set-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .set-label { font-size: 12px; color: var(--dim); width: 36px; flex-shrink: 0; }
+  .set-input { background: #111; border: 1px solid var(--border2); border-radius: 5px; color: var(--text); padding: 6px 8px; font-size: 13px; width: 70px; font-family: inherit; outline: none; text-align: center; }
+  .set-input:focus { border-color: var(--green); }
+  .set-x { color: var(--dim); font-size: 12px; }
+  .set-check { width: 20px; height: 20px; border-radius: 4px; border: 1px solid var(--border2); background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; color: transparent; flex-shrink: 0; }
+  .set-check.done { background: var(--green); border-color: var(--green); color: #000; }
+
+  .progress-bar-wrap { background: var(--surface2); border-radius: 4px; height: 4px; margin-top: 10px; overflow: hidden; }
+  .progress-bar-fill { height: 100%; background: var(--green); border-radius: 4px; transition: width 0.3s ease; }
+  .progress-label { font-size: 11px; color: var(--dim); margin-top: 4px; text-align: right; }
+
+  .notes-section { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-top: 8px; }
+  .notes-title { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .notes-input { width: 100%; background: #111; border: 1px solid var(--border2); border-radius: 6px; color: var(--text); padding: 10px 12px; font-size: 13px; font-family: inherit; outline: none; resize: vertical; min-height: 70px; line-height: 1.5; }
+  .notes-input:focus { border-color: var(--green); }
+  .notes-input::placeholder { color: var(--dimmer); }
+  .save-btn { background: var(--green); border: none; border-radius: 6px; color: #000; font-size: 12px; font-weight: 700; padding: 8px 16px; cursor: pointer; font-family: inherit; margin-top: 8px; }
+  .saved-msg { font-size: 12px; color: var(--green); margin-top: 6px; display: none; }
+
+  .section-divider { font-size: 10px; color: var(--dim); text-transform: uppercase; letter-spacing: 2px; margin: 16px 0 8px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="eyebrow">Due Season</div>
+    <h1>Gym Training Program</h1>
+    <div class="week-tabs" id="week-tabs"></div>
+  </div>
+</div>
+
+<div class="main" id="main"></div>
+
+<script>
+const STORAGE_KEY = 'gym_training_v1';
+
+const PHASES = [
+  { week: 1, label: 'Week 1', phase: 'Reintroduction', desc: 'One set back in the gym already told you everything. This week is about re-establishing movement patterns and letting your stabilizers, tendons, and connective tissue wake up. Work up to a weight that feels like a 6-7 out of 10. Stop 3 reps short of failure on every set. No ego lifting — this is an investment.' },
+  { week: 2, label: 'Week 2', phase: 'Reintroduction', desc: 'Same movements. Add one set per exercise where you feel ready. Push to a 7-8 RPE. You should be leaving the gym feeling worked but not destroyed. If you\'re still significantly sore from the previous session, keep the weight the same.' },
+  { week: 3, label: 'Week 3', phase: 'Build', desc: 'Start adding weight to the bar. RPE 8-9 on your top sets. This is where adaptation really begins. Take note of what you\'re lifting — these are your new baselines to beat.' },
+  { week: 4, label: 'Week 4', phase: 'Deload', desc: 'Drop volume by 40%. Same movements, reduce weight by about 20%, cut sets to 2 per exercise. This is not optional — your connective tissue needs this after ramping up, especially coming back from a long layoff. You will feel better for it in Week 5.' },
+];
+
+const SCHEDULE = [
+  { label: 'Mon', type: 'push', text: 'Push' },
+  { label: 'Tue', type: 'pull', text: 'Pull' },
+  { label: 'Wed', type: 'legs', text: 'Legs' },
+  { label: 'Thu', type: 'upper', text: 'Upper' },
+  { label: 'Fri', type: 'rest', text: 'Cardio' },
+  { label: 'Sat', type: 'rest', text: 'Rest' },
+  { label: 'Sun', type: 'rest', text: 'Rest' },
+];
+
+const DAYS = [
+  {
+    id: 'push',
+    label: 'Monday',
+    type: 'push',
+    title: 'Push — Chest, Shoulders, Triceps',
+    sections: [
+      { title: 'Primary', exercises: [
+        { id: 'db_press', name: 'Dumbbell Bench Press', sets: '3×10–12 (add set in week 2+)', desc: 'Primary horizontal push. Lie flat, dumbbells at chest level, elbows at ~45°. Press up and slightly together. Control the descent — 2-3 counts down.', note: 'Replaces barbell bench. Dumbbells let your shoulder find its natural path, which matters for your right shoulder. Start conservative — you\'ll find your working weight fast.', warn: null },
+        { id: 'incline_db', name: 'Incline Dumbbell Press', sets: '3×10–12', desc: 'Set bench to 30-45°. Same mechanics as flat — control the eccentric, press up strong. Upper chest emphasis.', note: null, warn: null },
+        { id: 'ohp', name: 'Seated Dumbbell Shoulder Press', sets: '3×10–12', desc: 'Seated, back supported. Start with dumbbells at ear height, press overhead. Full lockout at top, controlled descent.', note: 'Seated takes your lower back out of it. Use dumbbells rather than barbell to allow natural shoulder path.', warn: 'Right shoulder: if overhead pressing causes discomfort, drop to a 3/4 range of motion — stop just before full lockout. If that still bothers it, swap for lateral raises and front raises instead.' },
+      ]},
+      { title: 'Accessories', exercises: [
+        { id: 'lateral_raise', name: 'Dumbbell Lateral Raise', sets: '3×15', desc: 'Standing, light dumbbells. Raise arms out to shoulder height, lead with your elbows. Controlled return. This is a shoulder health and delt isolation movement — keep the weight honest.', note: null, warn: null },
+        { id: 'cable_fly', name: 'Cable Fly or Pec Deck', sets: '3×12–15', desc: 'Set cables at chest height. Slight forward lean, slight bend in elbows. Squeeze your chest at the center. Slow return. If pec deck is available, that works too.', note: 'Isolation work after pressing. Keep weight light enough to feel the contraction, not just move the weight.', warn: null },
+        { id: 'tricep_pushdown', name: 'Cable Tricep Pushdown', sets: '3×12–15', desc: 'Rope or straight bar attachment. Elbows pinned at sides, extend fully, squeeze at the bottom. Slow return.', note: null, warn: null },
+        { id: 'overhead_ext', name: 'Overhead Cable Tricep Extension', sets: '3×12', desc: 'Face away from cable, rope attachment overhead. Extend arms forward from elbow. Keep upper arms still.', note: null, warn: null },
+      ]},
+    ]
+  },
+  {
+    id: 'pull',
+    label: 'Tuesday',
+    type: 'pull',
+    title: 'Pull — Back, Biceps',
+    sections: [
+      { title: 'Primary', exercises: [
+        { id: 'bent_row', name: 'Barbell Bent-Over Row', sets: '3×8–10', desc: 'Overhand grip, hip hinge to ~45°, row to your lower chest/upper abdomen. Control the descent. Squeeze your shoulder blades at the top.', note: 'Your strongest back movement. This is the one to focus on adding weight to over the coming weeks. Start light — your traps and rhomboids already told you they\'ve been on vacation.', warn: null },
+        { id: 'pulldown', name: 'Lat Pulldown', sets: '3×10–12', desc: 'Wide overhand grip. Pull to upper chest, lead with your elbows, lean back slightly. Squeeze lats at bottom. Slow return.', note: null, warn: null },
+        { id: 'seated_row', name: 'Seated Cable Row', sets: '3×10–12', desc: 'V-bar or wide grip. Row to your lower chest, elbows back, squeeze your shoulder blades together. Controlled return — feel the stretch at the front.', note: null, warn: null },
+      ]},
+      { title: 'Accessories', exercises: [
+        { id: 'face_pull', name: 'Face Pull', sets: '3×20', desc: 'Cable at face height, rope attachment. Pull toward your face, elbows high and flared, hands ending near your ears. Squeeze rear delts and rotator cuff hard at the end.', note: 'Non-negotiable for shoulder health. Do this every pull day and every upper day. High reps, light weight — this isn\'t a strength movement.', warn: null },
+        { id: 'upright_row', name: 'Upright Row', sets: '3×10–12', desc: 'Barbell or EZ bar. Pull to chin height, elbows leading and flaring out. Controlled descent.', note: 'You confirmed this doesn\'t bother your shoulder. Keep it in.', warn: null },
+        { id: 'db_curl', name: 'Dumbbell Curl', sets: '3×12', desc: 'Alternate arms. Full range, no swinging. Supinate (rotate palm up) as you curl. Squeeze at top.', note: null, warn: null },
+        { id: 'hammer_curl', name: 'Hammer Curl', sets: '3×12', desc: 'Neutral grip (thumbs up) throughout. Hits brachialis and forearms in addition to biceps. Can do both arms simultaneously or alternate.', note: null, warn: null },
+        { id: 'barbell_curl', name: 'Barbell Curl', sets: '3×10', desc: 'Straight bar or EZ bar. Keep elbows pinned at your sides. Full range of motion. No cheating — if you\'re swinging, the weight is too heavy.', note: null, warn: null },
+      ]},
+    ]
+  },
+  {
+    id: 'legs',
+    label: 'Wednesday',
+    type: 'legs',
+    title: 'Legs — Quads, Hamstrings, Glutes, Calves',
+    sections: [
+      { title: 'Primary', exercises: [
+        { id: 'squat', name: 'Barbell Back Squat', sets: '3×8 (week 1) → 4×6–8 (week 3+)', desc: 'Bar on upper traps (high bar) or rear delts (low bar — your call based on your old preference). Feet shoulder-width, toes slightly out. Break at hips and knees simultaneously. Hit depth, drive through your heels to stand.', note: 'Your most important movement. You have the pattern ingrained from years of lifting — let it come back naturally. Start at a weight that feels almost embarrassingly light. Your legs will remind you why that\'s the right call.', warn: 'Knees: controlled descent every rep. 3 counts down, drive up. If your knees are talking to you at a certain depth, work to that depth and build from there.' },
+        { id: 'rdl', name: 'Romanian Deadlift', sets: '3×10', desc: 'Barbell. Hip hinge — push hips back, slight knee bend, back flat. Lower until strong hamstring stretch. Drive hips forward to stand. Bar stays close to your legs the whole way.', note: 'This is what lit up your inner thighs and posterior chain. Keep the weight honest for weeks 1-2.', warn: null },
+        { id: 'deadlift', name: 'Conventional Deadlift', sets: '3×5', desc: 'Feet hip width, bar over mid-foot. Hinge down, grip just outside legs. Neutral spine, big breath, brace, push the floor away. Lock out at top. Lower controlled.', note: 'Five reps per set intentionally — deadlifts are neurologically taxing and technique breaks down fast when fatigued coming back from a layoff. Quality over quantity here.', warn: null },
+      ]},
+      { title: 'Accessories', exercises: [
+        { id: 'leg_press', name: 'Leg Press', sets: '3×12', desc: 'Feet shoulder-width or slightly wider on the platform. Lower until your knees reach roughly 90°. Press through your heels. Don\'t lock out completely at the top.', note: 'Good volume work after squats without loading your spine further.', warn: null },
+        { id: 'leg_curl', name: 'Lying Leg Curl', sets: '3×12', desc: 'Full range — let the weight stretch your hamstring at the top, curl to full contraction. Slow and controlled both ways.', note: 'Lying leg curl on Wednesday, more lying leg curl work on Friday — different volume, same machine. The hamstrings need the attention.', warn: null },
+        { id: 'ghd_glute', name: 'GHD Glute Raise', sets: '3×12', desc: 'Adjust GHD so your hips are at the pad edge. Lower your torso toward the floor by hinging at the hip, then squeeze your glutes to return to horizontal. Keep your back flat — this is a hip hinge, not a back extension.', note: 'You confirmed glute focus is fine. Keep it to this range for now — no hyperextension past horizontal.', warn: 'Do NOT go into spinal hyperextension. Horizontal is your endpoint.' },
+        { id: 'abductor', name: 'Hip Abductor Machine', sets: '3×15', desc: 'Seated, push knees outward against resistance. Full range, controlled return.', note: 'Targets glute medius and outer hip. Also provides stability work that directly supports your knees — weak abductors contribute to knee tracking issues.', warn: null },
+        { id: 'adductor', name: 'Hip Adductor Machine', sets: '3×15', desc: 'Seated, squeeze knees inward against resistance. Full range, controlled return. Superset with the abductor — same machine, just flip the pad position.', note: 'Hits your inner thighs directly. This is what got destroyed in your first session back. Building strength here will help with both your squat and your sumo deadlift.', warn: null },
+        { id: 'calf_raise_standing', name: 'Standing Calf Raise', sets: '4×15', desc: 'Full range — heel below the step at the bottom, full extension at the top. Pause briefly at the top. Slow descent.', note: 'Calves respond to volume and full range. 4 sets here.', warn: null },
+      ]},
+    ]
+  },
+  {
+    id: 'upper',
+    label: 'Thursday',
+    type: 'upper',
+    title: 'Upper Body — Balanced Volume',
+    sections: [
+      { title: 'Push', exercises: [
+        { id: 'db_press_b', name: 'Dumbbell Bench Press', sets: '3×10', desc: 'Same as Monday. Moderate weight — this is your second push session of the week so total volume is already high. Aim for the same weight as Monday but don\'t push past it today.', note: null, warn: null },
+        { id: 'arnold_press', name: 'Arnold Press', sets: '3×10', desc: 'Start with dumbbells at chin height, palms facing you. As you press up, rotate your palms to face forward. Reverse on the way down. Hits all three delt heads.', note: 'Good variation from straight shoulder press. Shoulder-friendly movement pattern.', warn: null },
+      ]},
+      { title: 'Pull', exercises: [
+        { id: 'pullup', name: 'Pull-ups or Assisted Pull-ups', sets: '3×max', desc: 'Overhand, shoulder-width or wider. Full hang at the bottom, chin over bar. Use the assisted machine if needed — no shame, the movement pattern is what matters.', note: 'With your strength history these will come back fast. Even if you need assistance now, you won\'t for long.', warn: null },
+        { id: 'db_row_b', name: 'Dumbbell Row', sets: '3×10–12 each side', desc: 'One knee on bench, row dumbbell to your hip. Keep back flat. Pull with your elbow, not your hand.', note: null, warn: null },
+        { id: 'face_pull_b', name: 'Face Pull', sets: '3×20', desc: 'Same as Tuesday. Cable at face height, rope, elbows high. This is shoulder maintenance work — do it every upper session.', note: null, warn: null },
+      ]},
+      { title: 'Arms', exercises: [
+        { id: 'ez_curl', name: 'EZ Bar Curl', sets: '3×10', desc: 'EZ bar takes pressure off the wrists compared to straight bar. Full range, controlled.', note: null, warn: null },
+        { id: 'skullcrusher', name: 'EZ Bar Skullcrusher', sets: '3×10', desc: 'Lying on bench, lower EZ bar toward your forehead by bending at the elbows. Press back up. Keep upper arms vertical.', note: 'Classic tricep mass builder. Keep the weight conservative — elbows don\'t love heavy skullcrushers when you\'re just getting back.', warn: null },
+        { id: 'cable_curl', name: 'Cable Curl', sets: '3×12', desc: 'Low cable, straight or EZ bar attachment. Keeps constant tension through the whole range unlike free weights.', note: null, warn: null },
+      ]},
+    ]
+  },
+  {
+    id: 'lower_b',
+    label: 'Friday',
+    type: 'lower',
+    title: 'Cardio — Stationary Bike',
+    sections: [
+      { title: 'Session', exercises: [
+        { id: 'bike_warmup', name: 'Warm-Up', sets: '5 minutes', desc: 'Start at low resistance, easy pace. Get your legs moving and your heart rate up gradually.', note: null, warn: null },
+        { id: 'bike_steady', name: 'Steady State Ride', sets: '30–45 minutes', desc: 'Set resistance so you\'re working but can still hold a conversation — roughly a 6 out of 10 effort. Aim for around 80-90 RPM cadence if the bike displays it. Increase duration by 5 minutes each week until you\'re comfortable at 45 minutes.', note: 'Have something to listen to or watch. Bike cardio gets monotonous fast and that\'s the main reason people cut sessions short.', warn: null },
+        { id: 'bike_cooldown', name: 'Cool-Down', sets: '5 minutes', desc: 'Drop resistance to minimum, easy spin. Lets your heart rate come down gradually and keeps blood moving through your legs.', note: 'Your knees will likely feel better after bike cardio than before — increased blood flow helps flush inflammation. Don\'t be surprised if stairs feel slightly better on Friday evenings.', warn: null },
+      ]},
+    ]
+  },
+];
+
+// ---- State ----
+let currentWeek = 1;
+let expandedExercises = new Set();
+let loadingMeals = new Set();
+
+function getStorage() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch { return {}; } }
+function saveStorage(d) { localStorage.setItem(STORAGE_KEY, JSON.stringify(d)); }
+function weekKey() { return `week${currentWeek}`; }
+function getWeekData() { const s = getStorage(); if (!s[weekKey()]) s[weekKey()] = {}; return s[weekKey()]; }
+function saveWeekData(d) { const s = getStorage(); s[weekKey()] = d; saveStorage(s); }
+function getExData(dayId, exId) { const w = getWeekData(); if (!w[dayId]) w[dayId] = {}; if (!w[dayId][exId]) w[dayId][exId] = { done: false, sets: [], notes: '' }; return w[dayId][exId]; }
+function saveExData(dayId, exId, data) { const w = getWeekData(); if (!w[dayId]) w[dayId] = {}; w[dayId][exId] = data; saveWeekData(w); }
+
+function renderWeekTabs() {
+  document.getElementById('week-tabs').innerHTML = PHASES.map(p =>
+    `<button class="week-tab ${p.week===currentWeek?'active':''}" onclick="setWeek(${p.week})">${p.label}</button>`
+  ).join('');
+}
+
+function renderMain() {
+  const phase = PHASES.find(p => p.week === currentWeek);
+  const main = document.getElementById('main');
+  let html = `
+    <div class="phase-banner">
+      <div class="phase-title">Phase: ${phase.phase}</div>
+      <div class="phase-desc">${phase.desc}</div>
+    </div>
+    <div class="schedule">
+      ${SCHEDULE.map(d => `<div class="schedule-day ${d.type==='rest'?'rest-day':'active-day'}"><div class="sd-label">${d.label}</div><div class="sd-type">${d.text}</div></div>`).join('')}
+    </div>`;
+
+  DAYS.forEach(day => {
+    const weekData = getWeekData();
+    const dayData = weekData[day.id] || {};
+    const allEx = day.sections.flatMap(s => s.exercises);
+    const completedCount = allEx.filter(ex => (dayData[ex.id]||{}).done).length;
+    const pct = Math.round((completedCount / allEx.length) * 100);
+
+    html += `<div class="day-section">
+      <div class="day-header">
+        <span class="day-tag ${day.type}">${day.label}</span>
+        <span class="day-title">${day.title}</span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+      <div class="progress-label">${completedCount}/${allEx.length} exercises logged</div>
+      <div style="margin-top:10px;">`;
+
+    day.sections.forEach(section => {
+      html += `<div class="section-divider">${section.title}</div>`;
+      section.exercises.forEach(ex => { html += renderExercise(day.id, ex); });
+    });
+
+    html += `</div>
+      <div class="notes-section">
+        <div class="notes-title">Session notes — ${day.title}</div>
+        <textarea class="notes-input" id="notes-${day.id}" placeholder="Weights used, how it felt, what to adjust next session...">${(dayData._notes||'')}</textarea>
+        <button class="save-btn" onclick="saveNotes('${day.id}')">Save notes</button>
+        <div class="saved-msg" id="saved-${day.id}">Saved ✓</div>
+      </div>
+    </div>`;
+  });
+
+  main.innerHTML = html;
+}
+
+function renderExercise(dayId, ex) {
+  const data = getExData(dayId, ex.id);
+  const isOpen = expandedExercises.has(dayId+'_'+ex.id);
+  const numSets = parseInt(ex.sets.match(/(\d+)×/)?.[1]||'3');
+  const setsHtml = Array.from({length:numSets},(_,i) => {
+    const set = data.sets[i]||{weight:'',reps:'',done:false};
+    return `<div class="set-row">
+      <span class="set-label">Set ${i+1}</span>
+      <input class="set-input" type="number" placeholder="lbs" value="${set.weight||''}" onchange="updateSet('${dayId}','${ex.id}',${i},'weight',this.value)"/>
+      <span class="set-x">×</span>
+      <input class="set-input" type="number" placeholder="reps" value="${set.reps||''}" onchange="updateSet('${dayId}','${ex.id}',${i},'reps',this.value)"/>
+      <button class="set-check ${set.done?'done':''}" onclick="toggleSet('${dayId}','${ex.id}',${i})">✓</button>
+    </div>`;
+  }).join('');
+
+  return `<div class="exercise-card">
+    <div class="exercise-header" onclick="toggleEx('${dayId}','${ex.id}')">
+      <div class="ex-left">
+        <div class="ex-name">${ex.name}</div>
+        <div class="ex-sets">${ex.sets}</div>
+      </div>
+      <div class="ex-right">
+        <button class="ex-done ${data.done?'checked':''}" onclick="event.stopPropagation();toggleExDone('${dayId}','${ex.id}')">✓</button>
+        <span class="chevron">${isOpen?'▲':'▼'}</span>
+      </div>
+    </div>
+    ${isOpen?`<div class="exercise-body">
+      <div>${ex.desc}</div>
+      ${ex.note?`<div class="note">${ex.note}</div>`:''}
+      ${ex.warn?`<div class="note warn">⚠ ${ex.warn}</div>`:''}
+      <div class="set-log"><div class="set-log-title">Log your sets</div>${setsHtml}</div>
+    </div>`:''}
+  </div>`;
+}
+
+function setWeek(w) { currentWeek=w; expandedExercises.clear(); renderWeekTabs(); renderMain(); }
+function toggleEx(dayId,exId) { const k=dayId+'_'+exId; expandedExercises.has(k)?expandedExercises.delete(k):expandedExercises.add(k); renderMain(); }
+function toggleExDone(dayId,exId) { const d=getExData(dayId,exId); d.done=!d.done; saveExData(dayId,exId,d); renderMain(); }
+function updateSet(dayId,exId,idx,field,value) { const d=getExData(dayId,exId); if(!d.sets[idx]) d.sets[idx]={weight:'',reps:'',done:false}; d.sets[idx][field]=value; saveExData(dayId,exId,d); }
+function toggleSet(dayId,exId,idx) { const d=getExData(dayId,exId); if(!d.sets[idx]) d.sets[idx]={weight:'',reps:'',done:false}; d.sets[idx].done=!d.sets[idx].done; saveExData(dayId,exId,d); renderMain(); }
+function saveNotes(dayId) { const val=document.getElementById('notes-'+dayId)?.value||''; const w=getWeekData(); if(!w[dayId]) w[dayId]={}; w[dayId]._notes=val; saveWeekData(w); const msg=document.getElementById('saved-'+dayId); if(msg){msg.style.display='block';setTimeout(()=>msg.style.display='none',2000);} }
+
+renderWeekTabs();
+renderMain();
+</script>
+</body>
+</html>
